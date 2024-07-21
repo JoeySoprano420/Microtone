@@ -8,5 +8,8 @@ class MicrotonETranspiler:
         return self.byte_code
 
     def convert_to_byte_code(self, statement):
-        # Convert AST to byte code
-        pass
+        if statement['type'] == 'function_definition':
+            return f'DEF {statement["name"]} {len(statement["parameters"])}'
+        if statement['type'] == 'print':
+            return f'PRINT {statement["expression"]}'
+        return 'NOP'
