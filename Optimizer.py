@@ -3,5 +3,9 @@ class MicrotonEOptimizer:
         self.byte_code = byte_code
 
     def optimize(self):
-        # Optimize byte code
-        pass
+        # Optimize byte code logic
+        optimized_code = []
+        for instruction in self.byte_code:
+            if instruction != 'NOP':
+                optimized_code.append(instruction)
+        return optimized_code
