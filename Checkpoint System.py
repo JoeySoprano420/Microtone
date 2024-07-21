@@ -1,13 +1,11 @@
-import pickle
-
-class MicrotonECheckpointSystem:
-    def __init__(self, filename):
-        self.filename = filename
+class MicrotonECheckpoint:
+    def __init__(self):
+        self.checkpoints = []
 
     def save_checkpoint(self, state):
-        with open(self.filename, 'wb') as f:
-            pickle.dump(state, f)
+        self.checkpoints.append(state)
 
-    def load_checkpoint(self):
-        with open(self.filename, 'rb') as f:
-            return pickle.load(f)
+    def load_checkpoint(self, index):
+        if index < len(self.checkpoints):
+            return self.checkpoints[index]
+        return None
