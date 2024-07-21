@@ -14,12 +14,15 @@ class MicrotonEInterpreter:
 
     def define_function(self, statement):
         # Define function logic
-        pass
+        self.variables[statement['name']] = statement
 
     def print(self, statement):
         value = self.evaluate_expression(statement['expression'])
         print(value)
 
     def evaluate_expression(self, expression):
-        # Evaluate expression logic
-        pass
+        if expression in self.variables:
+            return self.variables[expression]
+        if expression.isdigit():
+            return int(expression)
+        return expression
