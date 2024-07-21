@@ -1,16 +1,20 @@
-import hashlib
-
-class MicrotonEHashwords:
+class HashwordManager:
     def __init__(self):
+        self.hashwords = {}
         self.keys = {}
         self.locks = {}
 
-    def generate_key(self, identifier):
-        key = hashlib.sha256(identifier.encode()).hexdigest()
-        self.keys[identifier] = key
-        return key
+    def add_hashword(self, hashword, value):
+        self.hashwords[hashword] = value
 
-    def generate_lock(self, identifier):
-        lock = hashlib.sha256(identifier.encode()).hexdigest()
-        self.locks[identifier] = lock
-        return lock
+    def get_hashword(self, hashword):
+        return self.hashwords.get(hashword, None)
+
+    def add_key(self, key, lock):
+        self.keys[key] = lock
+
+    def unlock(self, key):
+        lock = self.keys.get(key, None)
+        if lock and lock in self.locks:
+            return self.locks[lock]
+        return None
