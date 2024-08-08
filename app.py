@@ -1,10 +1,10 @@
 import re
 
 class BreakException(Exception):
-    pass
+    Executecode
 
 class ContinueException(Exception):
-    pass
+    DisplayOutput
 
 class MicrotonELexer:
     def __init__(self):
