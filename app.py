@@ -1,12 +1,10 @@
 import re
 
-```
 class BreakException(Exception):
-    ExecuteCode
+    pass
 
 class ContinueException(Exception):
-    DisplayOutput
-```
+    pass
 
 class MicrotonELexer:
     def __init__(self):
@@ -212,14 +210,8 @@ class MicrotoneInterpreter:
         elif re.match(r"^\{.*\}$", expr):
             elements = expr[1:-1].split(",")
             return ('dictionary', {self.parse_expression(k.strip()): self.parse_expression(v.strip()) for k, v in (element.split(":") for element in elements)})
-        elif re.match(r"^\w+$", expr):
-            return ('identifier', expr)
         else:
-            match = re.match(r"(.*?)([+\-*/><=!]+)(.*)", expr)
-            if not match:
-                raise SyntaxError(f"Invalid expression: {expr}")
-            left, operator, right = match.groups()
-            return ('operation', self.parse_expression(left.strip()), operator.strip(), self.parse_expression(right.strip()))
+            return ('identifier', expr)
 
     def evaluate_expression(self, expr):
         if expr[0] == 'number':
@@ -228,154 +220,105 @@ class MicrotoneInterpreter:
             return expr[1]
         elif expr[0] == 'identifier':
             return self.global_variables.get(expr[1], None)
-        elif expr[0] == 'operation':
-            left = self.evaluate_expression(expr[1])
-            right = self.evaluate_expression(expr[3])
-            operator = expr[2]
-            if operator == '+':
-                return left + right
-            elif operator == '-':
-                return left - right
-            elif operator == '*':
-                return left * right
-            elif operator == '/':
-                return left / right
-            elif operator == '==':
-                return left == right
-            elif operator == '!=':
-                return left != right
-            elif operator == '<':
-                return left < right
-            elif operator == '>':
-                return left > right
-            elif operator == '<=':
-                return left <= right
-            elif operator == '>=':
-                return left >= right
-            else:
-                raise ValueError(f"Unknown operator: {operator}")
         elif expr[0] == 'call':
-            func_name = expr[1]
-            args = [self.evaluate_expression(arg) for arg in expr[2]]
-            func = self.functions.get(func_name)
-            if func:
-                params, body = func
-                if len(args) != len(params):
-                    raise TypeError(f"Function {func_name} expected {len(params)} arguments, got {len(args)}")
-                local_vars = dict(zip(params, args))
-                old_vars = self.global_variables.copy()
+            func_name, args = expr[1], expr[2]
+            if func_name in self.functions:
+                func_params, func_statements = self.functions[func_name]
+                if len(args) != len(func_params):
+                    raise ValueError("Function arguments mismatch")
+                local_vars = dict(zip(func_params, args))
                 self.global_variables.update(local_vars)
-                result = None
-                for statement in body:
-                    result = self.execute_statement(statement)
-                    if isinstance(result, BreakException):
-                        break
-                    elif isinstance(result, ContinueException):
-                        continue
-                self.global_variables = old_vars
-                return result
+                for stmt in func_statements:
+                    self.execute_statement(stmt)
+                return
+            elif func_name in self.builtins:
+                return self.builtins[func_name](*[self.evaluate_expression(arg) for arg in args])
             else:
-                raise NameError(f"Function {func_name} not defined")
+                raise ValueError(f"Undefined function {func_name}")
         elif expr[0] == 'list':
             return [self.evaluate_expression(element) for element in expr[1]]
         elif expr[0] == 'dictionary':
             return {self.evaluate_expression(k): self.evaluate_expression(v) for k, v in expr[1].items()}
+        elif expr[0] == 'lambda':
+            default_params, params = expr[1], expr[2]
+            return lambda *args: self.evaluate_expression(('call', default_params, args))
         else:
             raise ValueError(f"Unknown expression type: {expr[0]}")
 
     def execute_statement(self, statement):
         if statement[0] == 'assignment':
-            var_name, expr = statement[1], statement[2]
-            self.global_variables[var_name] = self.evaluate_expression(expr)
+            var, expr = statement[1], statement[2]
+            self.global_variables[var] = self.evaluate_expression(expr)
         elif statement[0] == 'function':
-            func_name, params, body = statement[1], statement[2], statement[3]
-            self.functions[func_name] = (params, body)
+            pass  # Handled in parse_function_definition
         elif statement[0] == 'print':
-            value = self.evaluate_expression(statement[1])
-            self.builtins['print'](value)
+            print(self.evaluate_expression(statement[1]))
         elif statement[0] == 'if':
             condition, true_statements, false_statements = statement[1], statement[2], statement[3]
             if self.evaluate_expression(condition):
                 for stmt in true_statements:
-                    result = self.execute_statement(stmt)
-                    if isinstance(result, BreakException):
-                        break
-                    elif isinstance(result, ContinueException):
-                        continue
+                    self.execute_statement(stmt)
             else:
                 for stmt in false_statements:
-                    result = self.execute_statement(stmt)
-                    if isinstance(result, BreakException):
-                        break
-                    elif isinstance(result, ContinueException):
-                        continue
+                    self.execute_statement(stmt)
         elif statement[0] == 'loop':
-            var_name, start, end, statements = statement[1], statement[2], statement[3], statement[4]
+            var, start, end, statements = statement[1], statement[2], statement[3], statement[4]
             for i in range(start, end + 1):
-                self.global_variables[var_name] = i
+                self.global_variables[var] = i
                 for stmt in statements:
-                    result = self.execute_statement(stmt)
-                    if isinstance(result, BreakException):
+                    try:
+                        self.execute_statement(stmt)
+                    except BreakException:
                         break
-                    elif isinstance(result, ContinueException):
+                    except ContinueException:
                         continue
         elif statement[0] == 'while':
             condition, statements = statement[1], statement[2]
             while self.evaluate_expression(condition):
                 for stmt in statements:
-                    result = self.execute_statement(stmt)
-                    if isinstance(result, BreakException):
+                    try:
+                        self.execute_statement(stmt)
+                    except BreakException:
                         break
-                    elif isinstance(result, ContinueException):
+                    except ContinueException:
                         continue
+        elif statement[0] == 'comment':
+            pass  # Comments are ignored
         elif statement[0] == 'return':
             return self.evaluate_expression(statement[1])
-        elif statement[0] == 'comment':
-            pass
         elif statement[0] == 'try':
             try_statements, except_statements = statement[1], statement[2]
             try:
                 for stmt in try_statements:
-                    result = self.execute_statement(stmt)
-                    if isinstance(result, BreakException):
-                        break
-                    elif isinstance(result, ContinueException):
-                        continue
+                    self.execute_statement(stmt)
             except Exception:
                 for stmt in except_statements:
-                    result = self.execute_statement(stmt)
-                    if isinstance(result, BreakException):
-                        break
-                    elif isinstance(result, ContinueException):
-                        continue
+                    self.execute_statement(stmt)
         elif statement[0] == 'lambda':
-            pass  # Lambda handling is not yet implemented
+            return statement
         elif statement[0] == 'break':
-            raise BreakException
+            raise BreakException()
         elif statement[0] == 'continue':
-            raise ContinueException
+            raise ContinueException()
         else:
             raise ValueError(f"Unknown statement type: {statement[0]}")
 
-    def execute(self, code):
-        lexer = MicrotonELexer()
-        tokens = lexer.tokenize(code)
-        program = self.parse_program(code)
-        for stmt in program:
+    def run(self, code):
+        statements = self.parse_program(code)
+        for stmt in statements:
             self.execute_statement(stmt)
 
-# Sample usage
+# Example Usage
 code = """
-define function add(x, y) rest
-    return x + y rest
+define function myfunc(a, b) rest
+  print a
+  print b
 end rest
 
 start This is a comment
-print "Hello, world!" rest
-x = 10 rest
-y = 20 rest
-print add(x, y) rest
+print "Hello, world!"
+myfunc(5, 10) rest
 """
 
 interpreter = MicrotoneInterpreter()
-interpreter.execute(code)
+interpreter.run(code)
